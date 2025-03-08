@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="images/liquid.ico" type="image/x-icon">
+    <title>Liquidation For Sellers</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="admin-dashboard-hidden" class="container admin-element">
+        <h2>Admin Dashboard</h2>
+        <input type="password" id="admin-password" placeholder="Admin Password" class="form-input">
+        <div id="admin-options">
+            <button id="create-admin-button" class="action-button admin-element">Create New Admin</button>
+        </div>
+        <div id="listings-list"></div>
+        <div id="seller-list"></div>
+    </div>
+    <div id="auth-container" class="container">
+        <img src="images/liquid.png" alt="LiquidationLogo" class="logo">
+        <button id="login-button" class="action-button">Login with Google</button>
+        <button id="guest-login-button" class="action-button">Guest Login</button>
+        <button id="logout-button" class="action-button" style="display: none;">Logout</button>
+        <div id="user-info" style="display: none;"></div>
+        <div class="button-group">
+            <button id="whatsapp-button" class="contact-button">Chat with Liquidation</button>
+            <button id="call-operator-button" class="contact-button">Call Us For Free!</button>
+            <button id="list-item-button" class="action-button">List an Item</button>
+            <button id="view-profile-button" class="action-button">View Profile</button>
+        </div>
+    </div>
+
+    <div id="listing-form" class="container" style="display: none;">
+        <h2 class="h2">List an Item</h2>
+        <input type="text" id="item-name" placeholder="Item Name" class="form-input"><br>
+        <input type="text" id="item-description" placeholder="Description" class="form-input"><br>
+        <input type="number" id="item-price" placeholder="Price" class="form-input"><br>
+        <input type="text" id="item-location" placeholder="Location" class="form-input"><br>
+        <input type="text" id="seller-contact" placeholder="Contact Details" class="form-input"><br>
+        <input type="file" id="item-image" accept="image/*"> <br>
+        <button id="identify-objects-button" class="action-button">Identify Objects</button>  <div id="objectDetectionResults"></div> <br> <button id="submit-listing" class="action-button">Submit Listing</button>
+    </div>
+
+    <div id="seller-profile" class="container" style="display: none;">
+        <h2>Seller Profile</h2>
+        <div id="seller-profile-info"></div>
+        <div id="seller-profile-listings" class="listings-grid">
+        
+        </div>
+    </div>
+
+    <div id="listings-container" class="container listings-grid">
+    </div>
+
+    <script>
+        document.getElementById('listing-form').addEventListener('click', function(event) {
+            if (event.target && event.target.id === 'identify-objects-button') {
+                event.preventDefault(); // Prevent form submission
+
+                const imageFile = document.getElementById('item-image').files[0]; // Correctly using your existing image input 'item-image'
+                if (!imageFile) {
+                    alert("Please upload an image first.");
+                    return;
+                }
+                const reader = new FileReader();
+
+                reader.onloadend = function() {
+                    const base64Image = reader.result.split(',')[1]; // Extract base64 data
+
+                    // Vision API request
+                    fetch('https://vision.googleapis.com/v1/images:annotate?key=YOUR_API_KEY', { // **REPLACE YOUR_API_KEY HERE**
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            "requests": [{
+                                "image": {
+                                    "content": base64Image
+                                },
+                                "features": [{
+                                    "type": "OBJECT_LOCALIZATION",
+                                    "maxResults": 10 // Adjust as needed
+                                }]
+                            }]
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        displayObjectDetectionResults(data); // Function to handle and display results
+                    })
+                    .catch(error => {
+                        console.error('Error calling Vision API:', error);
+                        alert('Error identifying objects. Please try again.');
+                    });
+                };
+
+                reader.readAsDataURL(imageFile); // Read image file as Data URL
+            }
+        });
+
+        function displayObjectDetectionResults(data) {
+            const resultsDiv = document.getElementById('objectDetectionResults');
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            if (data.responses && data.responses[0].localizedObjectAnnotations) {
+                const objects = data.responses[0].localizedObjectAnnotations;
+                if (objects.length > 0) {
+                    let resultsHTML = '<h3>Identified Objects:</h3><ul>';
+                    objects.forEach(object => {
+                        resultsHTML += `<li>${object.name} (Confidence: ${object.score.toFixed(2)})</li>`;
+                    });
+                    resultsHTML += '</ul>';
+                    resultsDiv.innerHTML = resultsHTML;
+                    // **Integration Point:** Here you can pre-fill form fields based on detected objects
+                    // Example (adjust to your form field IDs and desired logic):
+                    if (objects.length > 0) {
+                        document.getElementById('item-name').value = objects[0].name; // Use the first detected object as item name (example)
+                    }
+
+
+                } else {
+                    resultsDiv.innerHTML = '<p>No objects identified in the image.</p>';
+                }
+            } else if (data.error) {
+                resultsDiv.innerHTML = `<p>Error from Vision API: ${data.error.message}</p>`;
+            } else {
+                resultsDiv.innerHTML = '<p>No objects identified or unexpected response from API.</p>';
+            }
+        }
+    </script>
+    <script src="script.js"></script> 
+</body>
+</html>
